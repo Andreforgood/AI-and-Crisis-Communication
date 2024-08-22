@@ -1,0 +1,65 @@
+# Load the dataset，读取 Excel 文件中的第一个 sheet
+df = pd.read_excel('/Users/dongwenou/Downloads/DONOTSHARE20230823 and communication-article list.xls', sheet_name=0, engine='xlrd')
+
+# Extract relevant columns
+texts = df['Abstract'].dropna().tolist()
+print(texts[0])
+print(len(texts))
+
+# Load spaCy model
+#nlp = spacy.load('en_core_web_sm')
+nlp = spacy.load('en_core_web_trf')
+
+# Load spaCy model
+#nlp = spacy.load('en_core_web_sm')
+nlp = spacy.load('en_core_web_trf')
+
+# Apply NER extraction to the text data
+# 删除Abstract列中包含缺失值的行
+df = df.dropna(subset=['Abstract'])
+df['AI_Entities'] = df['Abstract'].apply(extract_ai_entities)
+
+df1 = df.dropna(subset=['Author Keywords'])
+
+# 拆分关键字
+df1['Author Keywords'] = df1['Author Keywords'].apply(lambda x: x.split('; '))
+
+import pandas as pd
+import spacy
+from spacy.pipeline import EntityRuler
+
+# 加载Spacy模型
+nlp = spacy.load('en_core_web_trf')
+
+# 定义并添加自定义关键词模式
+patterns = []
+keywords_list = df['Author Keywords'].dropna().tolist()
+
+# 动态添加关键字模式
+for keywords in keywords_list:
+    for keyword in keywords.split('; '):  # 假设关键字以分号和空格分隔
+        patterns.append({"label": "KEYWORD", "pattern": keyword})
+
+# 创建并添加EntityRuler
+ruler = nlp.add_pipe("entity_ruler", before="ner")
+ruler.add_patterns(patterns)
+
+# 定义关键词提取函数，提取关键词及其前后文
+def extract_custom_entities_with_context(text, window=2):
+    doc = nlp(text)
+    entities_with_context = []
+    for ent in doc.ents:
+        if ent.label_ in ["AI_TECH", "COMM_TERM", "KEYWORD"]:
+            start = max(ent.start - window, 0)
+            end = min(ent.end + window, len(doc))
+            context = doc[start:end].text
+            entities_with_context.append((ent.text, ent.label_, context))
+    return entities_with_context
+
+# 处理数据并提取关键词及其前后文
+df['Extracted Keywords with Context'] = df['Abstract'].apply(lambda x: extract_custom_entities_with_context(str(x)))
+
+# 显示结果
+#print(df[['Abstract', 'Extracted Keywords with Context']])
+print(df['Extracted Keywords with Context'])
+
