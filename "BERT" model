@@ -1,0 +1,27 @@
+import pandas as pd
+from transformers import pipeline, RobertaTokenizer, RobertaForTokenClassification
+
+# 加载RoBERTa模型和tokenizer
+model_name = "Jean-Baptiste/roberta-large-ner-english"
+tokenizer = RobertaTokenizer.from_pretrained(model_name)
+model = RobertaForTokenClassification.from_pretrained(model_name)
+
+# 使用pipeline进行实体识别
+nlp = pipeline("ner", model=model, tokenizer=tokenizer, device=0 if torch.cuda.is_available() else -1)
+
+# 删除缺失值
+df = df.dropna(subset=['Abstract'])
+
+# 定义提取实体的函数
+def extract_entities(text):
+    if isinstance(text, str):
+        entities = nlp(text)
+        return [(entity['word'], entity['entity'], entity['score']) for entity in entities]
+    else:
+        return []
+
+# 应用函数到数据框的Abstract列
+df['AI_Entities'] = df['Abstract'].apply(extract_entities)
+
+#print(df[['Abstract', 'AI_Entities']].to_string())
+print(df['AI_Entities'])
