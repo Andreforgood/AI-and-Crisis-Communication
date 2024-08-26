@@ -1,0 +1,51 @@
+# Combine all entities into a single list
+all_entities = [entity for sublist in df['AI_Entities'].tolist() for entity in sublist]
+
+# Frequency analysis of AI entities
+entity_freq = Counter(all_entities)
+print(entity_freq.most_common(20))
+
+# Function to preprocess text for keyword extraction and topic modeling
+def preprocess_text(text):
+    doc = nlp(text.lower())
+    tokens = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]
+    return ' '.join(tokens)
+    
+#tokens = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]: Lemmatize tokens, remove stop words and punctuation.
+#return ' '.join(tokens): Return the processed text as a single string.
+
+# Preprocess the text data
+df['Processed_Text'] = df['Abstract'].apply(preprocess_text)
+
+# Extract keywords using TF-IDF
+tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2, stop_words='english')
+tfidf = tfidf_vectorizer.fit_transform(df['Processed_Text'])
+#stop_words='english'表示使用英语停用词列表，这会过滤掉常见但无意义的词语，如“and”，“or”，“but”等。
+#fit_transform方法将拟合模型并转换输入数据。具体来说，它会计算TF-IDF权重，并将输入的文本数据转换为一个稀疏矩阵（每行对应一个文档，每列对应一个词语）。
+
+# Apply LDA for topic modeling
+lda = LatentDirichletAllocation(n_components=10, random_state=0)
+lda.fit(tfidf)
+# LDA Topic Modeling:
+#LatentDirichletAllocation(n_components=10, random_state=0): Initialize LDA with 10 topics.
+#lda.fit(tfidf): Fit the LDA model to the TF-IDF features.
+
+# Function to display topics
+def display_topics(model, feature_names, no_top_words):
+    topics = {}
+    for topic_idx, topic in enumerate(model.components_):
+        #argsort() 是 NumPy 数组的方法，用于返回数组值从小到大排序的索引。
+        topics[topic_idx] = [feature_names[i] for i in topic.argsort()[:-no_top_words - 1:-1]] #从数组开头取到倒数第几个元素，步长为-1，即倒着取
+        #表示从排序后的索引数组末尾逆序取 no_top_words 个元素，即权重最大的 no_top_words 个词语索引。
+    return topics
+# model 是已经训练好的主题模型，如LDA（Latent Dirichlet Allocation）模型。
+# feature_names 是词汇表（即每个词对应的特征名），通常是从矢量化器（如 TfidfVectorizer 或 CountVectorizer）中获得的。
+# no_top_words 指定了每个主题要显示的词语数量。
+
+# Display the topics
+tfidf_feature_names = tfidf_vectorizer.get_feature_names_out()
+topics = display_topics(lda, tfidf_feature_names, 10)
+print(topics)
+
+# tfidf_vectorizer.get_feature_names_out(): Get the feature names from the TF-IDF vectorizer.
+# display_topics(lda, tfidf_feature_names, 10): Display the top 10 words for each topic.
